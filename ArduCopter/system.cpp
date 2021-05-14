@@ -1,5 +1,5 @@
 #include "Copter.h"
-#include <AP_BLHeli/AP_BLHeli.h>
+#include <AP_ESC_Telem/AP_ESC_Telem.h>
 
 /*****************************************************************************
 *   The init_ardupilot function processes everything we need for an in - air restart
@@ -138,8 +138,10 @@ void Copter::init_ardupilot()
     init_precland();
 #endif
 
+#if LANDING_GEAR_ENABLED == ENABLED
     // initialise landing gear position
     landinggear.init();
+#endif
 
 #ifdef USERHOOK_INIT
     USERHOOK_INIT
@@ -276,12 +278,12 @@ void Copter::update_dynamic_notch()
             }
             break;
 #endif
-#ifdef HAVE_AP_BLHELI_SUPPORT
+#if HAL_WITH_ESC_TELEM
         case HarmonicNotchDynamicMode::UpdateBLHeli: // BLHeli based tracking
             // set the harmonic notch filter frequency scaled on measured frequency
             if (ins.has_harmonic_option(HarmonicNotchFilterParams::Options::DynamicHarmonic)) {
                 float notches[INS_MAX_NOTCHES];
-                const uint8_t num_notches = AP_BLHeli::get_singleton()->get_motor_frequencies_hz(INS_MAX_NOTCHES, notches);
+                const uint8_t num_notches = AP::esc_telem().get_motor_frequencies_hz(INS_MAX_NOTCHES, notches);
 
                 for (uint8_t i = 0; i < num_notches; i++) {
                     notches[i] =  MAX(ref_freq, notches[i]);
@@ -292,7 +294,7 @@ void Copter::update_dynamic_notch()
                     ins.update_harmonic_notch_freq_hz(throttle_freq);
                 }
             } else {
-                ins.update_harmonic_notch_freq_hz(MAX(ref_freq, AP_BLHeli::get_singleton()->get_average_motor_frequency_hz() * ref));
+                ins.update_harmonic_notch_freq_hz(MAX(ref_freq, AP::esc_telem().get_average_motor_frequency_hz() * ref));
             }
             break;
 #endif
@@ -428,7 +430,7 @@ void Copter::update_auto_armed()
         // if motors are armed and throttle is above zero auto_armed should be true
         // if motors are armed and we are in throw mode, then auto_armed should be true
         } else if (motors->armed() && !ap.using_interlock) {
-            if(!ap.throttle_zero || control_mode == Mode::Number::THROW) {
+            if(!ap.throttle_zero || flightmode->mode_number() == Mode::Number::THROW) {
                 set_auto_armed(true);
             }
         }
